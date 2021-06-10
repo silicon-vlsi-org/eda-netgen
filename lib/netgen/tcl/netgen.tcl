@@ -6,7 +6,7 @@
 # in shell script "netgen.sh".
 #
 
-set NETGEN_HOME $::env(NETGNE_HOME)
+set NETGEN_HOME $::env(NETGEN_HOME)
 
 # Check namespaces for existence of other applications
 set UsingMagic 0
