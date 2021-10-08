@@ -22,8 +22,8 @@ Netgen is currently maintained by Tim Edwards (opencircuitdesign.com/netgen)
 - Add the following environment variables in your `~/.bashrc` (**NOTE**: The path below is an example, make sure it matches your particular path) 
 
 ```bash
-export NETGEN_HOME=$HOME/eda-netgen
-export PATH=$PATH:$NETGEN_HOME/bin
+export NETGEN_HOME=$HOME/eda-netgen/glnxa64
+export PATH=$PATH:$NETGEN_HOME/glnxa64/bin
 ```
 
 ## Quick Start Guide
