@@ -1,7 +1,7 @@
 # ADMIN
 This documentation is NOT for users, only if you are interested to compile, install and mange releases as done in this repo.
 
-## Compiling and Installing Netgen
+## Compiling and Installing Netgen for Ubuntu 18.04
 
 **SETTING UP LINUX FOR COMPILE**
 
@@ -39,6 +39,8 @@ set NETGEN_HOME $::env(NETGEN_HOME)
 ```
 - Set the environment variables as shown in [README.md](README.md)
 
+**COMPILING FOR CENTOS**
+- Follow the same steps as ngspice and magic
 
 **CREATING A NEW RELEASE**
 
