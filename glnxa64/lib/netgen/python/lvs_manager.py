@@ -40,7 +40,7 @@ from treeviewsplit import TreeViewSplit
 # User preferences file (if it exists)
 prefsfile = '~/.profile/prefs.json'
 
-netgen_script_dir = '/home/ubuntu/sit-git-repos/silicon-vlsi-repos/eda-netgen/lib/netgen/python'
+netgen_script_dir = '/home/srout/eda-bins/netgen-15/lib/netgen/python'
 
 #------------------------------------------------------
 # Simple dialog for confirming quit

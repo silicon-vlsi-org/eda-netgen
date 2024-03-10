@@ -5,7 +5,7 @@
 # to point to the location of tclnetgen.so.  Also see comments
 # in shell script "netgen.sh".
 #
-
+# Added post make to allow for passing the env variable from bin/netgen
 set NETGEN_HOME $::env(NETGEN_HOME)
 
 # Check namespaces for existence of other applications
@@ -23,7 +23,7 @@ foreach i $nlist {
 }
 
 # -lazy option not needed if stubs libraries are handled correctly
-# load -lazy /home/ubuntu/sit-git-repos/silicon-vlsi-repos/eda-netgen/lib/netgen/tcl/tclnetgen.so
+# load -lazy $NETGEN_HOME/lib/netgen/tcl/tclnetgen.so
 
 load $NETGEN_HOME/lib/netgen/tcl/tclnetgen.so
 
@@ -64,16 +64,18 @@ proc netgen::convert_to_json {filename lvs_final} {
 	          puts $fjson "      \["
 		  set cktval [lindex $value 0]
 		  foreach pin [lrange $cktval 0 end-1] {
-		     puts $fjson "        \"$pin\","
+		     set pinstr [string map {"\\" "\\\\"} $pin]
+		     puts $fjson "        \"$pinstr\","
 		  }
-		  set pin [lindex $cktval end]
+		  set pin [string map {"\\" "\\\\"} [lindex $cktval end]]
 		  puts $fjson "        \"$pin\""
 	          puts $fjson "      \], \["
 		  set cktval [lindex $value 1]
 		  foreach pin [lrange $cktval 0 end-1] {
-		     puts $fjson "        \"$pin\","
+		     set pinstr [string map {"\\" "\\\\"} $pin]
+		     puts $fjson "        \"$pinstr\","
 		  }
-		  set pin [lindex $cktval end]
+		  set pin [string map {"\\" "\\\\"} [lindex $cktval end]]
 		  puts $fjson "        \"$pin\""
 	          puts $fjson "      \]"
 		  if {$kidx == $nkeys} {
@@ -395,7 +397,7 @@ proc netgen::lvs { name1 name2 {setupfile setup.tcl} {logfile comp.out} args} {
 	 # If argument is a filename then read the list of cells from it;
 	 # otherwise, argument is the list of files itself in quotes or
 	 # braces.
-	 if {![catch {file exists $value}]} {
+	 if {[file exists $value]} {
 	    if {![catch {open $value r} fnf]} {
 	       while {[gets $fnf line] >= 0} {
 		  if {[lindex $line 0] != "#"} {
@@ -479,8 +481,12 @@ proc netgen::lvs { name1 name2 {setupfile setup.tcl} {logfile comp.out} args} {
 
    netgen::compare assign "$fnum1 $cell1" "$fnum2 $cell2"
 
-   if {[file exists $setupfile]} {
-      puts stdout "Reading setup file $setupfile"
+   if {$setupfile == ""} {
+      puts stdout "\nNo setup file specified.  Using trivial default setup.\n"
+      netgen::permute default	;# transistors and resistors
+      netgen::property default
+   } elseif {[file exists $setupfile]} {
+      puts stdout "\nReading setup file $setupfile\n"
       # Instead of sourcing the setup file, run each line so we can
       # catch individual errors and not let them halt the LVS process
       set perrors 0
@@ -508,8 +514,10 @@ proc netgen::lvs { name1 name2 {setupfile setup.tcl} {logfile comp.out} args} {
 	 puts stdout "Warning:  There were errors reading the setup file"
       }
    } elseif {[string first nosetup $setupfile] < 0} {
-      netgen::permute default	;# transistors and resistors
-      netgen::property default
+      puts stderr "\nError:  Setup file $setupfile does not exist.\n"
+      return
+   } else {
+      puts stderr "\nNo setup file specified.  Continuing without a setup.\n"
    }
 
    if {[string first nolog $logfile] < 0} {
@@ -534,14 +542,24 @@ proc netgen::lvs { name1 name2 {setupfile setup.tcl} {logfile comp.out} args} {
    }
    set properr {}
    set matcherr {}
-   set pinsgood 0
+   set childMismatch 0		;# 1 indicates black-box child subcircuit mismatch
    while {$endval != {}} {
       if {$dolist == 1} {
          netgen::run -list converge
       } else {
          netgen::run converge
       }
-      netgen::log echo on
+      set pinMismatch 0		;# indicates pin mismatch in top cell
+      set doCheckFlatten 0
+      set doFlatten 0
+      if {[netgen::print queue] == {}} {
+	 set doEquatePins 1 	;# run equate pins on top cell
+      } else {
+	 set doEquatePins 0	;# don't run equate pins unless unique match
+      }
+      set forceMatch 0		;# for pin matching
+      netgen::log echo off
+
       if {[verify equivalent]} {
 	 # Resolve automorphisms by pin and property
 	 if {$dolist == 1} {
@@ -550,93 +568,105 @@ proc netgen::lvs { name1 name2 {setupfile setup.tcl} {logfile comp.out} args} {
             netgen::run resolve
 	 }
 	 set uresult [verify unique]
+	 # uresult:  -3 : unique with property error
+	 #	     -2 : equivalent with port errors
+	 #	     -1 : black box
+	 #	      0 : equivalent but not unique
+	 #	      1 : unique
          if {$uresult == 0} {
+	    netgen::log echo on
 	    netgen::log put "   Networks match locally but not globally.\n"
 	    netgen::log put "   Probably connections are swapped.\n"
 	    netgen::log put "   Check the end of logfile ${logfile} for implicated nodes.\n"
+	    netgen::log echo off
 	    if {$dolist == 1} {
 	       verify -list nodes
 	    } else {
 	       verify nodes
 	    }
-
-	    # Flatten the non-matching subcircuit (but not the top-level cells)
-            if {[netgen::print queue] != {}} {
-	       if {([lsearch $noflat [lindex $endval 0]] == -1) &&
-			([lsearch $noflat [lindex $endval 1]] == -1)} {
-	           netgen::log put "  Flattening non-matched subcircuits $endval"
-	           netgen::flatten class "[lindex $endval 0] $fnum1"
-	           netgen::flatten class "[lindex $endval 1] $fnum2"
-	       } else {
-	           netgen::log put "  Continuing with black-boxed subcircuits $endval"
-		   lappend matcherr [lindex $endval 0]
-	           # Match pins
-                   netgen::log echo off
-	           if {$dolist == 1} {
-		       set result [equate -list -force pins "$fnum1 [lindex $endval 0]" \
-				"$fnum2 [lindex $endval 1]"]
-	           } else {
-		       set result [equate -force pins "$fnum1 [lindex $endval 0]" \
-				"$fnum2 [lindex $endval 1]"]
-	           }
-	           if {$result != 0} {
-		       equate classes "$fnum1 [lindex $endval 0]" \
-			        "$fnum2 [lindex $endval 1]"
-	           }
-	           set pinsgood $result
-                   netgen::log echo on
-	       }
-	    }
+	    set doCheckFlatten 1
 	 } else {
-	    # Match pins
-            netgen::log echo off
-	    if {$dolist == 1} {
-		set result [equate -list pins "$fnum1 [lindex $endval 0]" \
-				"$fnum2 [lindex $endval 1]"]
-	    } else {
-		set result [equate pins "$fnum1 [lindex $endval 0]" \
-				"$fnum2 [lindex $endval 1]"]
-	    }
-	    if {$result != 0} {
-		equate classes "$fnum1 [lindex $endval 0]" \
-			 "$fnum2 [lindex $endval 1]"
-	    }
-	    set pinsgood $result
-            netgen::log echo on
+	    # Equate pins for black boxes, unique matches (possibly with property
+	    # errors), and unique with port errors
+	    set doEquatePins 1
 	 }
-	 if {$uresult == 2} {lappend properr [lindex $endval 0]}
+	 if {$uresult == -1} {		;# black box
+	    set forceMatch 1
+	 } elseif {$uresult == -3} {	;# property error
+	    lappend properr [lindex $endval 0]
+	 } elseif {$uresult == -2} {	;# unmatched pins
+	    set doCheckFlatten 1
+	 }
       } else {
-	 # Flatten the non-matching subcircuit (but not the top-level cells)
-         if {[netgen::print queue] != {}} {
-	    if {([lsearch $noflat [lindex $endval 1]] == -1) &&
-		    ([lsearch $noflat [lindex $endval 1]] == -1)} {
-	       netgen::log put "  Flattening non-matched subcircuits $endval"
-	       netgen::flatten class "[lindex $endval 0] $fnum1"
-	       netgen::flatten class "[lindex $endval 1] $fnum2"
-	    } else {
-	       netgen::log put "  Continuing with black-boxed subcircuits $endval"
-	       lappend matcherr [lindex $endval 0]
-	       netgen::log put "  Continuing with black-boxed subcircuits $endval"
-	       lappend matcherr [lindex $endval 0]
-	       # Match pins
-               netgen::log echo off
-	       if {$dolist == 1} {
-		   set result [equate -list -force pins "$fnum1 [lindex $endval 0]" \
-			    "$fnum2 [lindex $endval 1]"]
-	       } else {
-		   set result [equate -force pins "$fnum1 [lindex $endval 0]" \
-			    "$fnum2 [lindex $endval 1]"]
-	       }
-	       if {$result != 0} {
-		   equate classes "$fnum1 [lindex $endval 0]" \
-			    "$fnum2 [lindex $endval 1]"
-	       }
-	       set pinsgood $result
-               netgen::log echo on
+	 # not equivalent
+	 netgen::log echo on
+	 # netgen::log put "  DEBUG: not equivalent $endval\n"
+	 netgen::log echo off
+	 set doCheckFlatten 1
+      }
+      if {$doCheckFlatten} {
+	 # Flatten the non-matching subcircuit (but not the top-level cell,
+	 # or cells explicitly prohibited from flattening)
+	 if {[netgen::print queue] != {}} {
+	    if {([lsearch $noflat [lindex $endval 0]] == -1) &&
+			([lsearch $noflat [lindex $endval 1]] == -1)} {
+	       set doFlatten 1
+	    } else {	
+	       netgen::log echo on
+	       netgen::log put "  Continuing with black-boxed subcircuits $endval\n"
+	       netgen::log echo off
+	       lappend matcherr [lindex $endval 0]"($fnum1)"
+	       lappend matcherr [lindex $endval 1]"($fnum2)"
+	       netgen::flatten prohibit "[lindex $endval 0] $fnum1"
+	       netgen::flatten prohibit "[lindex $endval 1] $fnum2"
+	       set doEquatePins 1
+	       set childMismatch 1
+	       set forceMatch 1
 	    }
 	 }
       }
-      netgen::log echo off
+      if {$doEquatePins} {
+	 # Match pins
+	 if {$dolist == 1} {
+	    if {$forceMatch} {
+	       set result [equate -list -force pins "$fnum1 [lindex $endval 0]" \
+				"$fnum2 [lindex $endval 1]"]
+	    } else {
+	       set result [equate -list pins "$fnum1 [lindex $endval 0]" \
+				"$fnum2 [lindex $endval 1]"]
+	    }
+	 } else {
+	    if {$forceMatch} {
+	       set result [equate -force pins "$fnum1 [lindex $endval 0]" \
+				"$fnum2 [lindex $endval 1]"]
+	    } else {
+	       set result [equate pins "$fnum1 [lindex $endval 0]" \
+				"$fnum2 [lindex $endval 1]"]
+	    }
+	 }
+	 if {$result >= 0} {
+	    equate classes "$fnum1 [lindex $endval 0]" \
+		        "$fnum2 [lindex $endval 1]"
+	 }
+	 # Do not set pinMismatch for black boxes
+	 if {$result < 0} {
+	    if {$result == -1 && [netgen::print queue] != {} && $forceMatch != 1} {
+               # flatten pin mismatch, but not empty cells (-2) or top cell or
+	       # cells prohibited from flattening.
+	       set doFlatten 1
+	    }
+	 } elseif {[netgen::print queue] == {} && $result == 0} {
+	    set pinMismatch 1
+	 }
+      }
+      if {$doFlatten} {
+	 netgen::log echo on
+	 netgen::log put "  Flattening non-matched subcircuits $endval\n"
+	 netgen::log echo off
+	 netgen::flatten class "[lindex $endval 0] $fnum1"
+	 netgen::flatten class "[lindex $endval 1] $fnum2"
+      }
+
       if {$dolist == 1} {
          catch {lappend lvs_final $lvs_out}
          set lvs_out {}
@@ -645,19 +675,23 @@ proc netgen::lvs { name1 name2 {setupfile setup.tcl} {logfile comp.out} args} {
          set endval [netgen::compare hierarchical]
       }
    }
-   netgen::log echo off
-   puts stdout "Result: " nonewline
    netgen::log echo on
-   if {$pinsgood == 0} {
-      netgen::log put "The top level cell failed pin matching.\n"
+   netgen::log put "\nFinal result: "
+   if {$pinMismatch || $childMismatch} {
+      if {$childMismatch} {
+	 netgen::log put "Subcell(s) failed matching.\n"
+      }
+      if {$pinMismatch} {
+	 netgen::log put "Top level cell failed pin matching.\n"
+      }
    } else {
       verify only
    }
    if {$properr != {}} {
-      netgen::log put "The following cells had property errors: $properr\n"
+      netgen::log put "\nThe following cells had property errors:\n " [regsub -all { } $properr "\n "] "\n"
    }
    if {$matcherr != {}} {
-      netgen::log put "The following subcells failed to match: $matcherr\n"
+      netgen::log put "\nThe following subcells failed to match:\n " [regsub -all { } $matcherr "\n "] "\n"
    }
    if {$dolog} {
       netgen::log end
@@ -708,6 +742,19 @@ set auto_noexec 1       ;# don't EVER call UNIX commands w/o "shell" in front
 #----------------------------------------------------------------------
 # Cross-Application section
 #----------------------------------------------------------------------
+
+# For use with open_pdks, set PDK_ROOT from the environment.  If no
+# such environment variable exists, check some common locations.
+
+if {[catch {set PDK_ROOT $::env(PDK_ROOT)}]} {
+    if {[file isdir /usr/local/share/pdk] == 1} {
+	set PDK_ROOT /usr/local/share/pdk
+    } elseif {[file isdir /usr/share/pdk] == 1} {
+	set PDK_ROOT /usr/share/pdk
+    } elseif {[file isdir /foss/pdk] == 1} {
+	set PDK_ROOT /foss/pdk
+    }
+}
 
 # Setup IRSIM assuming that the Tcl version is installed.
 # We do not need to rename procedure irsim to NULL because it is
