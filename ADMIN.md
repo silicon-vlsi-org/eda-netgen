@@ -1,7 +1,7 @@
 # ADMIN
 This documentation is NOT for users, only if you are interested to compile, install and mange releases as done in this repo.
 
-## Compiling and Installing Netgen for Ubuntu 18.04
+## Compiling and Installing Netgen for Ubuntu 22.04
 
 **SETTING UP LINUX FOR COMPILE**
 
@@ -11,7 +11,7 @@ This documentation is NOT for users, only if you are interested to compile, inst
  
 **USING SOURCE FROM GIT REPO**
 
-- Compiled on Linux AWS Lightsail **5.4.0-1049-aws** #51~**18.04.1-Ubuntu**
+- Compiled on linode VM running Ubuntu 22.04 kernel  5.15.0-100-generic #110-Ubuntu 03/10/24
 - cd ```/home/ubuntu/sit-git-repos/eda-src```
 - ```git clone git://opencircuitdesign.com/netgen```
 - ```cd netgen```
