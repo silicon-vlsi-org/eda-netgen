@@ -1,6 +1,6 @@
 # Netgen
 ### Current distribution version 1.5.272
-Precompiled for **64b 22.04 Ubuntu and Ubuntu-based Linux**. It's also tested on a light-weight Ubuntu-variant LXLE distro. If you are interested in compiling from the source, instructions in [Compiling and Installing Magic](ADMIN.md) should help.
+Precompiled for **64b 22.04 Ubuntu and Ubuntu-based Linux**. It's also tested on a light-weight Ubuntu-variant LXLE distro. If you are interested in compiling from the source, instructions in [Compiling and Installing netgen](ADMIN.md) should help.
 
 [Netgen](http://opencircuitdesign.com/netgen/) is a tool for comparing netlists, a process known as LVS, which stands for "Layout vs. Schematic". This is an important step in the integrated circuit design flow, ensuring that the geometry that has been laid out matches the expected circuit.
 Netgen is currently maintained by Tim Edwards (opencircuitdesign.com/netgen)
