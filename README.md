@@ -19,7 +19,7 @@ Netgen is currently maintained by Tim Edwards (opencircuitdesign.com/netgen)
   - To make sure you are on the right version type ```git branch``` and your output should have a line like this :
   - ```* (HEAD detached at v1.5.272)```
 
-- Add the following environment variables in your `~/.bashrc` (**NOTE**: The path below is an example, make sure it matches your particular path) 
+- Add the following environment variables in your `~/.bashrc`  
 
 ```bash
 export NETGEN_HOME=<INSTALL_DIR>/eda-netgen/glnxa64
