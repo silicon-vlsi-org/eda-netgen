@@ -5,7 +5,8 @@
 # to point to the location of tclnetgen.so.  Also see comments
 # in shell script "netgen.sh".
 #
-# Added post make to allow for passing the env variable from bin/netgen
+
+# This has been added post install to fix a relative path issue
 set NETGEN_HOME $::env(NETGEN_HOME)
 
 # Check namespaces for existence of other applications
@@ -657,6 +658,11 @@ proc netgen::lvs { name1 name2 {setupfile setup.tcl} {logfile comp.out} args} {
 	    }
 	 } elseif {[netgen::print queue] == {} && $result == 0} {
 	    set pinMismatch 1
+	 } else {
+	    # This assumes that proxy pins are added correctly.  Previously,
+	    # that was not trusted, and so an initial pin mismatch would
+	    # always force subcells to be flattened.
+	    set doFlatten 0
 	 }
       }
       if {$doFlatten} {
