@@ -40,7 +40,8 @@ from treeviewsplit import TreeViewSplit
 # User preferences file (if it exists)
 prefsfile = '~/.profile/prefs.json'
 
-netgen_script_dir = '/home/usrvnc/eda-bins/netgen-1-5-295/lib/netgen/python'
+NETGEN_HOME = os.environ.get('NETGEN_HOME')
+netgen_script_dir = '$NETGEN_HOME/lib/netgen/python'
 
 #------------------------------------------------------
 # Simple dialog for confirming quit
